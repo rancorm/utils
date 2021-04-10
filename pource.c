@@ -14,6 +14,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include <netinet/in.h>
@@ -27,7 +28,7 @@
 /* Capture settings */
 #define POURCE_SNAPLEN		0x3c /* 0x22 = 34, 0x3c = 60 */
 #define POURCE_FILTER		"ip"
-#define POURCE_TIMEOUT		0x0 /* 0x1f4 = 500 */
+#define POURCE_TIMEOUT		0x1f4 /* 0x1f4 = 500 */
 #define POURCE_PROMISC		0x0
 
 /* Program pack to hold state */
@@ -82,6 +83,18 @@ int option_index = 0;
 void pource_exit(int);
 
 void
+pource_warn(char *fmt, ...) {
+	char *traverse;
+
+	va_list arg;
+	va_start(arg, fmt);
+
+	vfprintf(stderr, fmt, arg);
+
+	va_end(arg);
+}
+
+void
 iprint(struct in_addr addr) {
 	printf("%s", inet_ntoa(addr));
 }
@@ -104,14 +117,14 @@ catch_sig(int signo, void (*handler)()) {
 
 void
 pource_pack_dump(pource_pack *pack) {
-	if (pack->filename) printf("filename = %s\n", pack->filename);
-	if (pack->intf) printf("intf = %s\n", pack->intf);
-	if (pack->filter) printf("filter = %s\n", pack->filter);
+	if (pack->filename) pource_warn("filename = %s\n", pack->filename);
+	if (pack->intf) pource_warn("intf = %s\n", pack->intf);
+	if (pack->filter) pource_warn("filter = %s\n", pack->filter);
 
-	printf("dl = %d\n", pack->dl);
-	printf("dl_len = %d\n", pack->dl_len);
+	pource_warn("dl = %d\n", pack->dl);
+	pource_warn("dl_len = %d\n", pack->dl_len);
 
-	printf("flags = %d\n", pack->flags);
+	pource_warn("flags = %d\n", pack->flags);
 }
 
 void
@@ -185,6 +198,9 @@ pource_init(char *intf, char *filename, char *filter, u_char flags) {
 	pack->intf = intf;
 	pack->filter = filter;
 	pack->flags = flags;
+
+	/* Unbuffer stdout */
+	setbuf(stdout, NULL);
 
 	/* Live capture */
 	if (pack->flags & POURCE_OPT_INTF) {
@@ -272,32 +288,28 @@ pource_destroy(pource_pack *pack) {
 }
 
 void
-pource_warn(char *fmt, ...) {
-	char *traverse;
-
-	va_list arg;
-	va_start(arg, fmt);
-
-	vfprintf(stderr, fmt, arg);
-
-	va_end(arg);
-}
-
-void
 pource_loop_tcp(pource_pack *pack, struct tcphdr *tcph) {
-	pource_warn("TCP handler!\n");
+	printf(":%d.tcp|", ntohs(tcph->th_dport));
 }
 
 void
 pource_loop_udp(pource_pack *pack, struct udphdr *udph) {
-	pource_warn("UDP handler!\n");
+	return;
 }
 
 void
-pource_loop_ip(pource_pack *pack, struct ip *ip) {
+pource_loop_ip(pource_pack *pack, const struct pcap_pkthdr *h, struct ip *ip) {
+	/* Timestamp */
+	printf("%ld|", h->ts.tv_sec);
+
 	/* Source */
 	iprint(ip->ip_src);
-	printf("\n");
+	printf("|A|");
+	iprint(ip->ip_dst);
+	printf("/");
+	iprint(ip->ip_src);
+	printf("/");
+	iprint(ip->ip_src);
 
 	return;
 }
@@ -313,14 +325,14 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 
 	/* Pointers to start point of various headers */
 	struct ip *ip_h;
-    	struct tcphdr *tcp_h;
+	struct tcphdr *tcp_h;
 	struct udphdr *udp_h;
-    	const u_char *payload;
+	const u_char *payload;
 
-    	/* Header lengths in bytes */
-    	int eth_h_len; 
-    	int ip_h_len;
-    	int payload_len;
+	/* Header lengths in bytes */
+	int eth_h_len; 
+	int ip_h_len;
+	int payload_len;
 
  	/* Layer 2/hardware header */
 	struct ether_header *eth_h = (struct ether_header *)bytes;
@@ -329,7 +341,7 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 	if (ntohs(eth_h->ether_type) != ETHERTYPE_IP) {
 		pource_warn("Not an IP packet, skipping...\n");
 
-        	return;
+		return;
     	}
 
 	/* Retrieve datalink length from pack structure */
@@ -340,37 +352,38 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 	ip_h = (struct ip *)(bytes + eth_h_len);
     
 	/* The second-half of the first byte in ip_header contains the IP header length (IHL). */
-    	/* The IHL is number of 32-bit segments. Multiple by four to get a byte count for pointer arithmetic */
-    	ip_h_len = (ip_h->ip_hl & 0x0f) << 2;
-
-	pource_warn("Total packet available: %d bytes\n", h->caplen);
-	pource_warn("Expected packet size: %d bytes\n", h->len);
-	pource_warn("IP header length in bytes: %d\n", ip_h_len);
+	/* The IHL is number of 32-bit segments. Multiple by four to get a byte count for pointer arithmetic */
+	ip_h_len = (ip_h->ip_hl & 0x0f) << 2;
 
 	/* IP protocol */
 	ip_proto = ip_h->ip_p;
 
-	/* Handle IP */
-	pource_loop_ip(pack, ip_h);
 	
 	/* Handle TCP/UDP/ICMP protocols */
 	switch(ip_proto) {
 		case IPPROTO_TCP:
 			/* Calculate TCP header */	
 			tcp_h = (struct tcphdr *)(bytes + eth_h_len + ip_h_len);
-
+			
+			/* Handle IP */
+			pource_loop_ip(pack, h, ip_h);
 			pource_loop_tcp(pack, tcp_h);
+		
+			printf("\n");
 			break;
 		case IPPROTO_UDP:
 			udp_h = (struct udphdr *)(bytes + eth_h_len + ip_h_len);
 
+			pource_loop_ip(pack, h, ip_h);
 			pource_loop_udp(pack, udp_h);
+			printf("\n");
 			break;
 		case IPPROTO_ICMP:
 			break;
 		default:
 			break;
 	}
+
 }
 
 int
