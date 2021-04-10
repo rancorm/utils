@@ -21,6 +21,7 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/if_ether.h>
 
 #include <pcap.h>
@@ -294,7 +295,12 @@ pource_loop_tcp(pource_pack *pack, struct tcphdr *tcph) {
 
 void
 pource_loop_udp(pource_pack *pack, struct udphdr *udph) {
-	return;
+	printf(":%d.udp|", ntohs(udph->uh_dport));
+}
+
+void
+pource_loop_icmp(pource_pack *pack, struct icmp *icmph) {
+	printf(":%d.icmp|", ntohs(icmph->icmp_type));
 }
 
 void
@@ -327,6 +333,7 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 	struct ip *ip_h;
 	struct tcphdr *tcp_h;
 	struct udphdr *udp_h;
+	struct icmp *icmp_h;
 	const u_char *payload;
 
 	/* Header lengths in bytes */
@@ -358,7 +365,6 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 	/* IP protocol */
 	ip_proto = ip_h->ip_p;
 
-	
 	/* Handle TCP/UDP/ICMP protocols */
 	switch(ip_proto) {
 		case IPPROTO_TCP:
@@ -379,6 +385,11 @@ pource_loop_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
 			printf("\n");
 			break;
 		case IPPROTO_ICMP:
+			icmp_h = (struct icmp *)(bytes + eth_h_len + ip_h_len);
+
+			pource_loop_ip(pack, h, ip_h);
+			pource_loop_icmp(pack, icmp_h);
+			printf("\n");
 			break;
 		default:
 			break;
