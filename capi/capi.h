@@ -2,6 +2,12 @@
 * capi.h
 *
 */
+#ifndef __CAPI_H
+#define __CAPI_H
+
+#ifndef TRUE
+#define TRUE 1
+#endif	/* TRUE */
 
 typedef struct _capi_pack {
 	char *host;
@@ -32,3 +38,5 @@ capi_command *capi_find_cmd(char *);
 #define CAPI_VERSION	"0.1"
 #define CAPI_AUTHOR	"Jonathan Cormier <jonathan@cormier.co>"
 #define CAPI_PROMPT	"cAPI> "
+
+#endif /* __CAPI_H */

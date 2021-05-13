@@ -84,7 +84,7 @@ capi_cmd_cookie(char *name) {
 
 void
 capi_cmd_exit(char *name) {
-	done = 1;
+	done = TRUE;
 }
 
 capi_command *
