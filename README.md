@@ -1,3 +1,3 @@
 # Utils
 
-Scripts and utilities that I wrote and use on a daily basis
+Scripts and utilities that I wrote or collected, some that I use on the daily.

@@ -1,6 +1,6 @@
 #!/bin/sh 
 #
-# aws-iam-authorized-keys
+# aws-iam-authorized-keys.sh
 #
 # Copyright (C) 2018 Jonathan Cormier <jonathan@cormier.co>
 #
