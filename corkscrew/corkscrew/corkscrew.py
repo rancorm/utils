@@ -22,23 +22,41 @@ import json
 from signal import signal, SIGINT
 
 from urllib.parse import urlparse
-from urllib.request import urlopen, Request
+from urllib.request import urlopen, build_opener, Request, HTTPCookieProcessor
 from urllib.error import HTTPError
 
+# Cookie monster love cookies!
+from http.cookiejar import CookieJar, DefaultCookiePolicy
+
 CORKSCREW_VERSION = "0.1"
-CORKSCREW_PROMPT = "corkscrew> "
+CORKSCREW_PROMPT = "corkscrew[{}]> "
 # Default protocol scheme
 CORKSCREW_SCHEME = "https"
+CORKSCREW_DEFAULT_METHOD = "GET"
 CORKSCREW_AUTHOR = "Jonathan Cormier"
+
+CORKSCREW_CODEC = "latin-1"
 
 CORKSCREW_HEADERS = {
 	"User-Agent": "Corkscrew/" + CORKSCREW_VERSION,
-	"Accept": "text/*,application/xhtml+xml,application/xml,application/json,application/ld+json",
+	"Accept": "*/*",
 	#"Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
-	#"Accept-Encoding": "none"k,
+	#"Accept-Encoding": "none",
 	#"Accept-Language": "en-US,en;q=0.8",
 	"Connection": "keep-alive"
 }
+
+CORKSCREW_REQUEST_METHODS = [
+	"CONNECT",
+	"DELETE",
+	"GET",
+	"HEAD",
+	"OPTIONS",
+	"PATCH",
+	"POST",
+	"PUT",
+	"TRACE"
+]
 
 # Deprecated headers
 CORKSCREW_DEPRECATED_HEADERS = [
@@ -61,18 +79,6 @@ CORKSCREW_GENERAL_HEADERS = [
 	"Upgrade",
 	"Want-Digest",
 	"Warning"
-]
-
-CORKSCREW_REQUEST_METHODS = [
-	"CONNECT",
-	"DELETE",
-	"GET",
-	"HEAD",
-	"OPTIONS",
-	"PATCH",
-	"POST",
-	"PUT",
-	"TRACE"
 ]
 
 # Request headers
@@ -110,69 +116,6 @@ CORKSCREW_REQUEST_HEADERS = [
 	# Experimental
 	"Device-Memory"
 ]
-
-# Response codes
-# CORKSCREW_RESPONSE_CODES = {
-# 	# 1xx  Informational Response
-# 	100: "Continue",
-# 	101: "Switching Protocols",
-# 	103: "Early Hints",
-# 	# 2xx Successful
-# 	200: "OK",
-# 	201: "Created",
-# 	202: "Accepted",
-# 	203: "Non-Authoritative Information",
-# 	204: "No Content",
-# 	205: "Reset Content",
-# 	206: "Partial Content",
-# 	# 3xx Redirection
-# 	300: "Multiple Choices",
-# 	301: "Moved Permanently",
-# 	302: "Found",
-# 	303: "See Other",
-# 	304: "Not Specified",
-# 	307: "Temporary Redirect",
-# 	308: "Permanent Redirect",
-# 	# 4xx Client Error
-# 	400: "Bad Request",
-# 	401: "Unauthorized",
-# 	402: "Payment Required",
-# 	403: "Forbidden",
-# 	404: "Not Found",
-# 	405: "Method Not Allowed",
-# 	406: "Not Acceptable",
-# 	407: "Proxy Authentication Required",
-# 	408: "Request Timeout",
-# 	409: "Conflict",
-# 	410: "Gone",
-# 	411: "Length Required",
-# 	412: "Precondition Failed",
-# 	413: "Payload Too Large",
-# 	414: "URI Too Long",
-# 	415: "Unsupported Media Type",
-# 	416: "Range Not Satisfiable",
-# 	417: "Expectation Failed",
-# 	418: "I'm a teapot",
-# 	422: "Unprocessable Entity",
-# 	425: "Too Early",
-# 	426: "Upgrade Required",
-# 	428: "Precondition Required",
-# 	429: "Too Many Requests",
-# 	431: "Request Header Fields Too Large",
-# 	451: "Unavailable For Legal Reasons",
-# 	# 5xx Server Error
-# 	500: "Internal Server Error",
-# 	501: "Not Implemented",
-# 	502: "Bad Gateway",
-# 	503: "Service Unavailable",
-# 	504: "Gateway Timeout",
-# 	505: "HTTP Version Not Supported",
-# 	506: "Variant Also Negotiates",
-# 	507: "Insufficient Storage",
-# 	508: "Loop Detected",
-# 	510: "Not Extended",
-# 	511: "Network Authentication Required"
-# }
 
 # Response headers
 CORKSCREW_RESPONSE_HEADERS = [
@@ -241,26 +184,32 @@ CORKSCREW_ENTITY_HEADERS = [
 
 # Text colors
 class colors:
-	GREEN = '\033[32m'
-	LIGHTGREEN = '\033[92m'
-	RED = '\033[91m'
-	PURPLE = '\033[95m'
-	LIGHTPURPLE = '\033[94m'
-	ENDC = '\033[0m'
-	BOLD = '\033[1m'
-	CYAN = '\033[96m'
-	UNDERLINE = '\033[4m'
-	YELLOW = '\033[93m'
-	BLACK = '\033[98m'
+	GREEN = "\033[32m"
+	LIGHTGREEN = "\033[92m"
+	RED = "\033[31m"
+	LIGHTRED = "\033[91m"
+	PURPLE = "\033[35m"
+	PINK = "\033[95m"
+	ENDC = "\033[0m"
+	BOLD = "\033[1m"
+	CYAN = "\033[36m"
+	LIGHTCYAN = "\033[96m"
+	UNDERLINE = "\033[4m"
+	YELLOW = "\033[93m"
+	LIGHTGRAY = "\033[98m"
+	DARKGRAY = "\033[90m"
+	ORANGE = "\033[33m"
+	BLUE = "\033[34m"
+	LIGHTBLUE = "\033[94m"
 	
 	# Background colors:
-	GREYBG = '\033[100m'
-	REDBG = '\033[101m'
-	GREENBG = '\033[102m'
-	YELLOWBG = '\033[103m'
-	BLUEBG = '\033[104m'
-	PINKBG = '\033[105m'
-	CYANBG = '\033[106m'
+	GREYBG = "\033[100m"
+	REDBG = "\033[101m"
+	GREENBG = "\033[102m"
+	YELLOWBG = "\033[103m"
+	BLUEBG = "\033[104m"
+	PINKBG = "\033[105m"
+	CYANBG = "\033[106m"
 
 def color_print(color, text, newline=True):
 	color_str = "{}{}{}".format(color, text, colors.ENDC)
@@ -295,7 +244,10 @@ class Corkscrew:
 		self.url_parts = urlparse(url, scheme=CORKSCREW_SCHEME)
 
 		# Build request	
-		self.request = Request(self.url, None, CORKSCREW_HEADERS)
+		self.request = Request(self.url,
+			None,
+			headers=CORKSCREW_HEADERS,
+			method=CORKSCREW_DEFAULT_METHOD)
 
 		# Save config
 		self.options = options
@@ -311,9 +263,19 @@ class Corkscrew:
 			# Alias to exit command
 			"QUIT": self.cmd_exit,
 			"REQUEST": self.cmd_request,
-			"COOKIE": self.cmd_cookie
+			"COOKIE": self.cmd_cookie,
+			"HOST": self.cmd_host
 		}
+		
+		# Cookie policy, jar, and opener
+		policy = DefaultCookiePolicy(rfc2965=True,
+			strict_ns_domain=DefaultCookiePolicy.DomainLiberal)
 
+		self.cookie_jar = CookieJar(policy)
+		self.opener = build_opener(HTTPCookieProcessor(self.cookie_jar))
+	def _decode_jwt(self):
+		# Future method for decoding Java Web Token (JWT) strings
+		pass
 	def _header_color(self, name):
 		# Custom headers
 		if name.startswith("X-"):
@@ -325,7 +287,7 @@ class Corkscrew:
 			elif name in CORKSCREW_ENTITY_HEADERS:
 				c = colors.LIGHTGREEN
 			elif name in CORKSCREW_RESPONSE_HEADERS:
-				c = colors.GREEN
+				c = colors.BLUE
 			elif name in CORKSCREW_REPR_HEADERS:
 				c = colors.ENDC
 			else:
@@ -333,6 +295,8 @@ class Corkscrew:
 
 		# Return header color
 		return c
+	def _print_divider(self, chars=80):
+		color_print(colors.DARKGRAY, "*" * chars)
 	def _dump_hex(self, data):
 		memory_address = 0
 		ascii_string = ""
@@ -357,32 +321,40 @@ class Corkscrew:
 			memory_address = memory_address + 1
 
 		print("")
-	def _list_current_headers(self, args=None):
-		# Print current request header headers and their values
-		for header,value in self.request.headers.items():
-			print(header + ": " + value)
 	def _print_http_header(self, name, value):
 		# Custom headers
 		color_print(self._header_color(name), name, newline=False)
-		print(":", value)
+
+		print(": ", end="")
+
+		# Check for JSON values
+		if value.startswith("{"):
+			print(json.dumps(json.loads(value),
+				indent=2,
+				sort_keys=True))
+		else:
+			print(value)
 	def _print_http_headers(self, headers):
 		for header,value in headers.items():
 			self._print_http_header(header, value)
 	def _print_http_body(self, body):
-		plain_text = True
+		decode_success = False
 
-		# Attempt to decode text as UTF-8
+		# Attempt to decode text
 		try:
-			content_body = body.decode('utf-8')
-		except UnicodeDecodeError as _:
-			plain_text = False
+			content_body = body.decode(CORKSCREW_CODEC)
+		except UnicodeDecodeError as e:
+			print(e)
+			decode_success = False
+		else:
+			decode_success = True
 
 		# Plain text, try JSON decode or just output as is
-		if plain_text:
+		if decode_success:
 			# Check for JSON
 			if(content_body.startswith("{")):
 				content_body = json.dumps(json.loads(content_body),
-					indent=3,
+					indent=2,
 					sort_keys=True)
 			else:
 				# Don't attempt to parse as JSON, output limited plain text body
@@ -393,62 +365,108 @@ class Corkscrew:
 		else:
 			# Unicode decode error, output to hex/ascii
 			self._dump_hex(body)
+	def _print_cookiejar(self):
+		# Cycle through cookies in jar
+		for cookie in self.cookie_jar:
+			cookie_name = cookie.name
+			cookie_text = "{} (domain: {}, expires: {}, secure: {})".format(
+				cookie.value,
+				cookie.domain,
+				cookie.expires,
+				cookie.secure)
 
+			# Output cookie name, value, and other details
+			color_print(colors.BLUE, cookie_name, newline=False)
+			print(":", cookie_text)
+	def _send_request(self):
+		# Output request info
+		request_method = self.request.method.upper()
+
+		color_print(colors.GREEN, request_method, newline=False)
+		print(" request to ", end="")
+		color_print(colors.GREEN, self.request.full_url)
+
+		# Output request headers
+		self._print_http_headers(self.request.headers)
+
+		# Output request data if any found
+		if self.request.data:
+			color_print(colors.GREEN, "Data:")
+			print(self.request.data)
+
+		# Try to send request
+		try:
+			with self.opener.open(self.request, timeout=30) as conn:
+				# Read and save response
+				self.response = conn.read()
+
+				print("\nResponse from ", end="")
+				color_print(colors.GREEN, conn.geturl())
+
+				# Output response headers
+				self._print_http_headers(conn.headers)
+
+				# Output response body and status
+				self._print_divider()
+				self._print_http_body(self.response)
+				self._print_divider()
+
+				# Output status code and reason
+				color_print(colors.CYAN, "{} {}".format(conn.status, conn.reason))
+		except HTTPError as e:
+			# Output error response
+			print("\nResponse from ", end="")
+			color_print(colors.RED, e.geturl())
+
+			self._print_http_headers(e.headers)
+
+			# Output divider, body, tatus code & reason
+			self._print_divider()
+			self._print_http_body(e.read())
+
+			color_print(colors.RED, "{} {}".format(e.code, e.reason))
 	# Commands
 	def cmd_get(self, args=None):
-		content_path = None
+		self.request.method = "GET"
 
 		# Command arguments
 		if args:
 			# If not URI make new request with full URL
 			if not args[0].startswith("/"):
-				self.request = Request(args[0], headers=CORKSCREW_HEADERS)
+				self.request = Request(args[0],
+					None,
+					headers=CORKSCREW_HEADERS,
+					method="GET")
 			else:
-				# Update selector with user provided one
+				# Update selector with user provided
 				self.request.selector = args[0]
 
-			# User provided path to content file
+		# Send GET
+		self._send_request()
+	def cmd_post(self, args=None):
+		# Change to POST and send request
+		self.request.method = "POST"
+
+		# User supplied arguments
+		if args:
+			# Update selector with user provided
+			self.request.selector = args[0]
+			
+			# Path to content file provided via arguments
 			if len(args) == 2:
 				content_path = os.path.abspath(args[1])
 
 				# Check if content file exists
 				if file_exists(content_path):
-					color_print(colors.GREEN, "Loading file {} for request".format(content_path))
+					color_print(colors.GREEN, "Using '{}' for POST data".format(content_path))
 
-		# Send HTTP request
-		try:
-			with urlopen(self.request) as conn:
-				color_print(colors.GREEN, "GET to {}...".format(self.request.host))
+					# Open file and add content as request data
+					with open(content_path, "rb") as f:
+						content = f.read()
+						self.request.data = content
 
-				# Output request headers
-				color_print(colors.PURPLE, "Request:")
-				self._print_http_headers(self.request.headers)
-
-				# Read and decode response
-				self.response = conn.read()
-				
-				# Output response headers
-				color_print(colors.PURPLE, "Response:")
-				self._print_http_headers(conn.headers)
-
-				# Output response body and status
-				color_print(colors.PURPLE, "+++")
-
-				# Output HTTP body
-				self._print_http_body(self.response)
-
-				# Output HTTP status
-				color_print(colors.CYAN, "{} {}".format(conn.status, conn.reason))
-		except HTTPError as e:
-			# Output HTTP error response headers
-			color_print(colors.GREEN, "Response:")
-
-			self._print_http_headers(e.headers)
-			
-			color_print(colors.PURPLE, "+++")
-			color_print(colors.RED, "{} {}".format(e.code, e.reason))
-	def cmd_post(self, args=None):
-		color_print(colors.GREEN, "POST to {}...".format(self.request.host))
+		# Send POST
+		self._send_request()
 	def cmd_patch(self, args=None):
 		None
 	def cmd_update(self, args=None):
@@ -460,28 +478,50 @@ class Corkscrew:
 
 		sys.exit(0)
 	def cmd_cookie(self, args=None):
-		pass
+		# Cookies
+		num_cookies = len(self.cookie_jar)
+
+		if num_cookies > 0:
+			if args:
+				cookie_name = args[0]
+
+				for cookie in self.cookie_jar:
+					if cookie_name == cookie.name:
+						print(cookie.value)
+						return
+			else:
+				print("Cookies ({}):".format(num_cookies))
+				self._print_cookiejar()
 	def cmd_request(self, args=None):
 		# No arguments, output current request information
 		if args == None:
 			color_print(colors.GREEN, "Request (current):")
 
+			print("Scheme:", self.request.type)
 			print("Host:", self.request.host)
 			print("Method:", self.request.get_method())
 			print("URI:", self.request.selector, "\n")
-			print("Headers:")
+
+			num_headers = len(self.request.headers)
+			print("Headers ({}):".format(num_headers))
 
 			# List request headers
-			self._list_current_headers()
+			self._print_http_headers(self.request.headers)
+
+			# Mmmm... cookies
+			num_cookies = len(self.cookie_jar)
+			
+			if num_cookies > 0:
+				print("\nCookies ({}):".format(num_cookies))
+				self._print_cookiejar()
 		else:
 			# Set new host
 			self.request.host = args[0]
 	def cmd_set(self, args=None):
 		# Output current options
 		if not args:
-			color_print(colors.GREEN, "Current options:\n")
-
-			print("Insecure:", self.options.insecure)
+			color_print(colors.GREEN, "Current app options:")
+			print("\nInsecure:", self.options.insecure)
 		else:
 			# If variable name and value provided try to update
 			if (len(args) == 2):
@@ -489,15 +529,26 @@ class Corkscrew:
 				value = args[1]
 
 				print("Set {} to {}".format(name, value))
+	def cmd_host(self, args=None):
+		if args:
+			new_host = args[0]
+
+			# Hostname validation?
+			self.request.host = new_host
+
+			color_print(colors.GREEN, "Host set to {}".format(new_host))
+		else:
+			print("Host:", self.request.host)
 	def run_cmd(self, cmd):
 		# Return method or None
 		return self.cmd_switcher.get(cmd.upper(), None)
 	def prompt(self):
 		line = ""
 
-		# Loop		
+		# Prompt loop		
 		while True:
-			line = input(CORKSCREW_PROMPT)
+			our_prompt = CORKSCREW_PROMPT.format(self.request.host)
+			line = input(our_prompt)
 			line_split = line.split()
 			
 			# Skip empty lines	
@@ -508,10 +559,11 @@ class Corkscrew:
 			cmd = line_split[0].upper()
 			args = line_split[1:]
 
+			# If no arguments set to None
 			if len(args) == 0:
 				args = None
 
-			# Run function
+			# Run function if one is found for command
 			func = self.run_cmd(cmd)
 			
 			if func is not None:

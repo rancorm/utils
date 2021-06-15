@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# kubetail - Kubernetes log tail script
+#
+# Author: Jonathan Cormier <jonathan@cormier.co>
+#
+#
+#
+TIMESTAMPS=0
+PREFIX=1
+
+# Path to kubectl
+KUBECTL=$(which kubectl)
+CONTAINER=$2
+
+# Parse command line or print usage
+if [ $# -ge 1 ]; then
+	SEL=$1
+else
+	echo "Usage: $0 [POD|SELECTOR|DEPLOYMENT] [CONTAINER]"
+	echo
+	echo "POD - pod name [example]"
+	echo "SELECTOR - selector for pod selection [label=example]"
+	echo "DEPLOYMENT - deployment [deployment/example]"
+	echo
+	echo "CONTAINER - limit to container" 
+
+	exit
+fi
+
+# Basic command to query logs
+KUBECMD="$KUBECTL logs --follow"
+
+# Check for selector
+case $SEL in 
+	*"="*)
+1		# Found selector
+		KUBECMD="$KUBECMD -l $SEL"
+		;;
+	*)
+		# Default use pods/deployments
+		KUBECMD="$KUBECMD -p $SEL"
+esac
+
+# Add container to command
+if [ -z $CONTAINER ]; then
+	KUBECMD="$KUBECMD -c $CONTAINER"
+fi
+
+# Timestamps
+if [ $TIMESTAMPS -eq 1 ]; then
+	KUBECMD="$KUBECMD --timestamps"		
+fi
+
+# Prefix
+if [ $PREFIX -eq 1 ]; then
+	KUBECMD="$KUBECMD --prefix"
+fi
+
+# 
+echo $KUBECMD
