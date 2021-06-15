@@ -4,10 +4,18 @@
 #
 # Author: Jonathan Cormier <jonathan@cormier.co>
 #
+# Example:
+#
+# $ kubetail my-pod
+# ...
+# <output from my-pod>
+# ...
+# $
 #
 #
 TIMESTAMPS=0
 PREFIX=1
+ALL=0
 
 # Path to kubectl
 KUBECTL=$(which kubectl)
@@ -31,6 +39,12 @@ fi
 # Basic command to query logs
 KUBECMD="$KUBECTL logs --follow"
 
+# Timestamps
+[ $TIMESTAMPS -eq 1 ] && KUBECMD="$KUBECMD --timestamps"
+
+# Prefix
+[ $PREFIX -eq 1 ] && KUBECMD="$KUBECMD --prefix"
+
 # Check for selector
 case $SEL in 
 	*"="*)
@@ -43,19 +57,7 @@ case $SEL in
 esac
 
 # Add container to command
-if [ -z $CONTAINER ]; then
-	KUBECMD="$KUBECMD -c $CONTAINER"
-fi
+[ ! -z $CONTAINER ] && KUBECMD="$KUBECMD -c $CONTAINER"
 
-# Timestamps
-if [ $TIMESTAMPS -eq 1 ]; then
-	KUBECMD="$KUBECMD --timestamps"		
-fi
-
-# Prefix
-if [ $PREFIX -eq 1 ]; then
-	KUBECMD="$KUBECMD --prefix"
-fi
-
-# 
-echo $KUBECMD
+# Run KUBECMD 
+eval $KUBECMD
