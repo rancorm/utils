@@ -12,7 +12,8 @@
 # ...
 # $
 #
-#
+
+# Script options
 TIMESTAMPS=0
 PREFIX=1
 ALL=0
@@ -27,11 +28,11 @@ if [ $# -ge 1 ]; then
 else
 	echo "Usage: $0 [POD|SELECTOR|DEPLOYMENT] [CONTAINER]"
 	echo
-	echo "POD - pod name [example]"
+	echo "POD - pod [example]"
 	echo "SELECTOR - selector for pod selection [label=example]"
 	echo "DEPLOYMENT - deployment [deployment/example]"
 	echo
-	echo "CONTAINER - limit to container" 
+	echo "CONTAINER - limit output to CONTAINER" 
 
 	exit
 fi
@@ -45,10 +46,13 @@ KUBECMD="$KUBECTL logs --follow"
 # Prefix
 [ $PREFIX -eq 1 ] && KUBECMD="$KUBECMD --prefix"
 
+# All containers
+[ $ALL -eq 1 ] && KUBECMD="$KUBECMD --all-containers"
+
 # Check for selector
 case $SEL in 
 	*"="*)
-1		# Found selector
+		# Found selector
 		KUBECMD="$KUBECMD -l $SEL"
 		;;
 	*)
