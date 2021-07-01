@@ -1,16 +1,24 @@
 import os
 from optparse import OptionParser
 import sys
+import logging
 
 from signal import signal, SIGINT
 from mycmd import MyCmd
 
-# MyCmd configuration paths
+# My CMD install path
+MYCMD_ROOT="~/.mycmd/"
+MYCMD_VERSION="0.1"
+
+# My CMD configuration paths
 MYCMD_PATHS=[
 	"~/.mycmd/",
 	"/etc/mycmd/",
 	"/usr/share/mycmd/"
 ]
+
+# Update file holds last time My CMD instance was updated
+MYCMD_LAST_UPDATE="last-update"
 
 # if sys.version_info < (3, 0):
 #     string_type = basestring
@@ -23,8 +31,8 @@ MYCMD_PATHS=[
 #     string_type = str
 
 parser = OptionParser()
-#parser.add_option("--insecure", action="store_false", dest="insecure", default=False, help="don't verify security certificates")
-#parser.add_option("--body-limit", action="store_false", dest="body_limit", default=2048, help="limit content body output (default: 2048)")
+parser.add_option("--refresh", action="store_true", default=False, help="pull latest commands from repository")
+parser.add_option("--version", action="store_true", default=False, help="show version")
 
 (opts, args) = parser.parse_args()
 
@@ -38,18 +46,32 @@ signal(SIGINT, ctrlc)
 our_name = sys.argv[0]
 
 # Check for host on command line, set to localhost if not found
-if (len(sys.argv) >= 2):
+if (len(args) >= 1):
 	# Capture command and arguments
-	cmd = sys.argv[1]
-	cmd_args = sys.argv[1:]
+	cmd = args[0]
+	cmd_args = args[1:]
 else:
-	print(f"Usage: {our_name:s} <cmd> [args] [...]")
+	# Check command line arguments
+	if opts.version:
+		print(f"App: {MYCMD_VERSION}")
+	elif opts.refresh:
+		print("Pulling new commands from X")
+	else:
+		print(f"Usage: {our_name:s} [--version] [--refresh] <cmd> [args] [...]\n")
+		print("Try 'list' or 'help' commands to get started")
 
 	sys.exit(0)
+
+# Check environment variable for logging level
+try:
+	logging_level = os.environ["MYCMD_LOG"]
+except KeyError as e:
+	logging_level = logging.INFO
 
 # Start mycmd with arguments and options
 cmd = MyCmd(cmd,
 	cmd_args,
 	MYCMD_PATHS,
 	opts,
-	args)
+	args,
+	logging_level)
