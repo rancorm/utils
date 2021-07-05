@@ -1,6 +1,9 @@
+# Import Python native modules your command will need
 
-from ...mycmd import MyCmdCmd
+# Import MyCmdCommand to use to make your command
+from ...mycmd import MyCmdCommand
 
-class HelloCmd(MyCmdCmd):
-    def handler(self, args=None):
-        pass
+# Example hello command
+class Hello(MyCmdCommand):
+    def handler(self, session, args=None):
+        print("Hi Developers!")

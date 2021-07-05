@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+#
+AWSCLI=$(which aws)
+SED=$(which sed)
+FUNC=my-function
+LIMIT=5
+
+OUTPUT="output.json"
+
+$AWSCLI lambda invoke \
+	--function-name $FUNC \
+	--cli-binary-format raw-in-base64-out \
+	--payload '{ "key": "value" }' $OUTPUT
+
+if [ $? -eq 254 ]; then
+	exit
+fi
+
+$SED -i'' -e 's/"//g' $OUTPUT
+
+sleep 15
+
+# Get AWS function log events from stream
+$AWSCLI logs get-log-events \
+	--log-group-name /aws/lambda/$FUNC \
+	--log-stream-name $(cat $OUTPUT) \
+	--limit $LIMIT 
