@@ -7,9 +7,7 @@ from optparse import OptionParser, SUPPRESS_USAGE
 # Path and SourceFileLoader for locating and loading modules
 from pathlib import Path
 from importlib.machinery import SourceFileLoader
-
-# Abstract classes
-from abc import ABC, abstractmethod
+from importlib.util import spec_from_file_location, module_from_spec, spec_from_loader
 
 # AWS SDK
 import boto3
@@ -19,28 +17,15 @@ from botocore.exceptions import ClientError
 # Name of directory containing command modules
 MYCMD_CMDS_DIRNAME = "cmds"
 
-class MyCmdCommand(ABC):
-	def __init__(self, name, args):
-		self.name = name
-		self.args = args
-
-		super().__init__()
-
-	@abstractmethod
-	def handler(self, session, args=None):
-		pass
-
 class MyCmd:
-	def __init__(self, cmd, cmd_args, conf, paths, log_level=logging.INFO, prog=None):
+	def __init__(self, cmd, cmd_args, conf, paths, log_level=logging.WARN, prog=None):
 		self.cmd = cmd
 		self.cmd_args = cmd_args
 		self.prog = prog
 		
 		# Dictionary of commands
-		self.cmds = {
-			"hello": self._cmd_hello
-		}
-		
+		self.cmds = {}
+
 		# Save boto session
 		self.session = Session()
 
@@ -56,7 +41,8 @@ class MyCmd:
 		else:
 			# Route command to proper loaded module
 			try:
-				cmd_func = self.cmds[self.cmd]
+				# Get handler function
+				cmd_func = self.cmds[self.cmd].handler
 
 				# Run command if module was found
 				if cmd_func:
@@ -76,25 +62,49 @@ class MyCmd:
 			self.log.debug(f"Loading commands in: {cmd_dir_full}")
 
 			# Loop through command directories
-			for (dirpath, dirnames, _) in os.walk(cmd_dir_full):
-				# Loop through command directory names
-				for dirname in dirnames:
-					self._load_command(dirname, dirpath)
+			try:
+				with os.scandir(cmd_dir_full) as it:
+					for entry in it:
+						if entry.is_dir:
+							entry_name = entry.name
+
+							# Check if command with name is already loaded to hash
+							if entry_name not in self.cmds:
+								self._load_command(entry_name, cmd_dir_full)
+							else:
+								self.log.debug(f"Command with name '{entry_name}' already exists, skipping...")
+			except FileNotFoundError as _:
+				pass
 	def _load_command(self, name, path):
 		# Build path to command module
 		cmd_path = Path(path).joinpath(name)
+		cmd_path_2 = cmd_path.joinpath(name + ".py")
 
-		self.log.debug(f"Found command '{name}' at {cmd_path}")
+		self.log.debug(f"Loading command '{name}' at {cmd_path}")
 
-		# Load command
+		# Load command module
+		spec = spec_from_file_location(name, cmd_path_2)
+		mod = module_from_spec(spec)
+		spec.loader.exec_module(mod)
 
-		# Store in local
+		# Init and store in local
+		command = mod.Command()
+		# Store command name and handler reference in commands dictionary
+
+		self.cmds.update({ name: command })
 	def _list_commands(self, verbose=False):
-		self.log.info(f"Available commands:")
+		self.log.info(f"NAME\t\tDESCRIPTION")
 
 		# Loop through loaded commands
 		for cmd in self.cmds:
-			self.log.info(cmd)
+			# Look for command description
+			try:
+				desc = self.cmds[cmd].desc
+			except AttributeError as _:
+				desc = ""
+
+			# Output command information
+			self.log.info(f"{cmd}\t\t{desc}")
 	def _cmd_list(self):
 		self.log.debug(f"List command argument(s): {self.cmd_args}")
 
@@ -107,12 +117,10 @@ class MyCmd:
 
 		# List commands with user set detail
 		self._list_commands(opts.detail)
-	def _cmd_hello(self):
-		print("Hellloo developers!")
 	def _run_command(self, name, cmd, args=None):
 		self.log.debug(f"Running command {name}")
 		self.log.debug(f"Command argument(s): {args}")
 
-		cmd()
+		cmd(self.session)
 
 		self.log.debug(f"End of {name}")

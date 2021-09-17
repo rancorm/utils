@@ -20,12 +20,13 @@ MYCMD_LAST_UPDATE="last-update"
 
 # Application search paths
 MYCMD_PATHS=[
+	os.path.dirname(os.path.abspath(__file__)), # Path to script (could be different)
 	"~/.mycmd/",
 	"/etc/mycmd/",
 	"/usr/share/mycmd/"
 ]
 
-# Name of environment variable for logging level
+# Name of environment variables
 MYCMD_ENV_LOG="MYCMD_LOG"
 MYCMD_ENV_NAME="MYCMD_NAME"
 
@@ -92,18 +93,18 @@ else:
 
 	sys.exit(0)
 
-# Check environment variable for logging level
+# Check environment variable for application logging level
 try:
 	logging_level = os.environ[MYCMD_ENV_LOG]
 except KeyError as e:
 	logging_level = logging.INFO
 
 # Start mycmd with arguments and options
-cmd = MyCmd(cmd,
-	cmd_args,
-	MYCMD_CONF,
-	MYCMD_PATHS,
-	logging_level,
+cmd = MyCmd(cmd,			# Command
+	cmd_args,				# Command argumnets
+	MYCMD_CONF,				
+	MYCMD_PATHS,			# Paths to check for command modules
+	logging_level,		# Logging level
 	our_name)
 
 cmd.run()
