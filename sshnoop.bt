@@ -9,15 +9,24 @@
 
 BEGIN
 {
+	/* Check arguments */
 	if ($1 == 0) {
+		printf("SSHnoop [BPF OpenSSH Session Snoop Tool]\n");
 		printf("Usage: sshnoop.bt <pid>\n");
+	
 		exit();
 	} else {
-		printf("Tracing SSH session\n");
+		printf("Snooping on PID %d\n", $1);
 	}
+
+	@map["pid"] = $1;	
 }
 
 END
 {
-	printf("Done\n");
+	if (@map["pid"]) {
+		printf("Done with PID %d\n", @map["pid"]);
+	}
+
+	clear(@map);
 }
