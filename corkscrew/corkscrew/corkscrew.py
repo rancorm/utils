@@ -29,7 +29,7 @@ from urllib.error import HTTPError
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 
 CORKSCREW_VERSION = "0.1"
-CORKSCREW_PROMPT = "corkscrew[{}]> "
+CORKSCREW_PROMPT = "{}[{}]> "
 # Default protocol scheme
 CORKSCREW_SCHEME = "https"
 CORKSCREW_DEFAULT_METHOD = "GET"
@@ -266,6 +266,8 @@ class Corkscrew:
 			"COOKIE": self.cmd_cookie,
 			"HOST": self.cmd_host
 		}
+
+		self.cmd = "GET"
 		
 		# Cookie policy, jar, and opener
 		policy = DefaultCookiePolicy(rfc2965=True,
@@ -540,14 +542,17 @@ class Corkscrew:
 		else:
 			print("Host:", self.request.host)
 	def run_cmd(self, cmd):
+		if cmd != ".":
+			self.cmd = cmd
+
 		# Return method or None
-		return self.cmd_switcher.get(cmd.upper(), None)
+		return self.cmd_switcher.get(self.cmd.upper(), None)
 	def prompt(self):
 		line = ""
 
 		# Prompt loop		
 		while True:
-			our_prompt = CORKSCREW_PROMPT.format(self.request.host)
+			our_prompt = CORKSCREW_PROMPT.format(self.cmd, self.request.host)
 			line = input(our_prompt)
 			line_split = line.split()
 			
