@@ -228,15 +228,15 @@ def response_color(code):
 	return None
 
 def is_character_printable(s):
-  ## This method returns true if a byte is a printable ascii character ##
-  return all((ord(c) < 127) and (ord(c) >= 32) for c in s)
+	## This method returns true if a byte is a printable ascii character ##
+	return all((ord(c) < 127) and (ord(c) >= 32) for c in s)
   
 def validate_byte_as_printable(byte):
-  ## Check if byte is a printable ascii character. If not replace with a '.' character ##
-  if is_character_printable(byte):
-    return byte
-  else:
-    return '.'
+	## Check if byte is a printable ascii character. If not replace with a '.' character ##
+	if is_character_printable(byte):
+		return byte
+	else:
+		return '.'
 
 class Corkscrew:
 	def __init__(self, url, options=None, args=None):
@@ -435,10 +435,17 @@ class Corkscrew:
 		if args:
 			# If not URI make new request with full URL
 			if not args[0].startswith("/"):
-				self.request = Request(args[0],
-					None,
-					headers=CORKSCREW_HEADERS,
-					method="GET")
+				# Create request, bailing on any URL formating issues
+				try:
+					self.request = Request(args[0],
+						None,
+						headers=CORKSCREW_HEADERS,
+						method="GET")
+				except ValueError as e:
+					print(e)
+					
+					# Bail
+					return None
 			else:
 				# Update selector with user provided
 				self.request.selector = args[0]
@@ -474,7 +481,8 @@ class Corkscrew:
 	def cmd_update(self, args=None):
 		None
 	def cmd_options(self, args=None):
-		None
+		# Output options
+		print(self.options)
 	def cmd_exit(self, args=None):
 		print("like tears in rain...")
 
@@ -542,11 +550,18 @@ class Corkscrew:
 		else:
 			print("Host:", self.request.host)
 	def run_cmd(self, cmd):
-		if cmd != ".":
-			self.cmd = cmd
+		upper_cmd = cmd.upper()
 
+		# Check for command and store it
+		if upper_cmd in self.cmd_switcher:
+			self.cmd = upper_cmd 
+		# Check dot (.) command
+		elif cmd != ".":
+			print("Invalid command: {}".format(cmd))
+			return None
+	
 		# Return method or None
-		return self.cmd_switcher.get(self.cmd.upper(), None)
+		return self.cmd_switcher.get(self.cmd, None)
 	def prompt(self):
 		line = ""
 
@@ -561,7 +576,7 @@ class Corkscrew:
 				continue
 			
 			# Collect command name and arguments
-			cmd = line_split[0].upper()
+			cmd = line_split[0]
 			args = line_split[1:]
 
 			# If no arguments set to None
