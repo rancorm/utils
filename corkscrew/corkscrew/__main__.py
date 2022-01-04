@@ -23,6 +23,7 @@ CORKSCREW_AUTHOR = "Jonathan Cormier"
 parser = OptionParser()
 parser.add_option("--insecure", action="store_false", dest="insecure", default=False, help="don't verify security certificates")
 parser.add_option("--body-limit", action="store_false", dest="body_limit", default=2048, help="limit content body output (default: 2048)")
+parser.add_option("--only-headers", action="store_true", dest="only_headers", default=False, help="Output only HTTP headers")
 
 (options, args) = parser.parse_args()
 
@@ -34,8 +35,8 @@ def ctrlc(signal_received, frame):
 signal(SIGINT, ctrlc)
 
 # Check for host on command line, set to localhost if not found
-if (len(sys.argv) == 2):
-    user_url = sys.argv[1]
+if (len(sys.argv) >= 2):
+    user_url = sys.argv[-1]
 else:
     user_url = "http://localhost"
 

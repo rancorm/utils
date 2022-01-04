@@ -23,7 +23,7 @@ from signal import signal, SIGINT
 
 from urllib.parse import urlparse
 from urllib.request import urlopen, build_opener, Request, HTTPCookieProcessor
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 # Cookie monster love cookies!
 from http.cookiejar import CookieJar, DefaultCookiePolicy
@@ -401,7 +401,7 @@ class Corkscrew:
 			with self.opener.open(self.request, timeout=30) as conn:
 				# Read and save response
 				self.response = conn.read()
-
+				
 				print("\nResponse from ", end="")
 				color_print(colors.GREEN, conn.geturl())
 
@@ -409,9 +409,10 @@ class Corkscrew:
 				self._print_http_headers(conn.headers)
 
 				# Output response body and status
-				self._print_divider()
-				self._print_http_body(self.response)
-				self._print_divider()
+				if not self.options.only_headers:
+					self._print_divider()
+					self._print_http_body(self.response)
+					self._print_divider()
 
 				# Output status code and reason
 				color_print(colors.CYAN, "{} {}".format(conn.status, conn.reason))
@@ -427,6 +428,9 @@ class Corkscrew:
 			self._print_http_body(e.read())
 
 			color_print(colors.RED, "{} {}".format(e.code, e.reason))
+		except URLError as le:
+			print(le.reason)
+
 	# Commands
 	def cmd_get(self, args=None):
 		self.request.method = "GET"
