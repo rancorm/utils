@@ -1,0 +1,61 @@
+/*
+* dotsnoop.bt [Hidden file snoop tool]
+*
+* Usage: sudo bpftrace dotsnoop.bt
+*
+*/
+#ifndef BPFTRACE_BTF
+#include <linux/path.h>
+#include <linux/dcache.h>
+#include <linux/fs.h>
+#endif
+
+
+kprobe:vfs_open
+{
+	$path = (struct path *)arg0;
+	$dentry = $path->dentry;
+	$name = str($dentry->d_name.name);
+
+	if (strncmp($name, ".", 1) == 0) {		
+		$depth = 0;
+
+		while ($dentry != 0) {
+			$entry_name = str($dentry->d_name.name);
+			
+			if ($depth > 32 || strncmp($entry_name, "/", 1) == 0) {
+				break;
+			}
+			
+			// Store current dentry name
+			@path_components[$depth] = $entry_name;
+			$depth++;
+
+			// Move up to parent
+			$dentry = $dentry->d_parent;
+		}
+
+		printf("Hidden file access:\n");
+		printf("-------------------\n");
+		printf("  File:    /");
+		
+		$i = $depth - 1;
+		while($i >= 0) {
+			printf("%s", @path_components[$i]);
+
+			if ($i > 0) {
+				printf("/");
+			}
+
+			$i--;
+		}
+
+		printf("\n");
+		printf("  Process: %s (PID: %d)\n", comm, pid);
+		printf("  UID:     %d\n", uid);
+		printf("  Time:    %lld\n", nsecs);
+		printf("-------------------\n");
+	}
+
+	clear(@path_components);
+}
