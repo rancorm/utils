@@ -3,6 +3,7 @@
 *
 * Usage: sudo bpftrace dotsnoop.bt
 *
+* Author: Jonathan Cormier <jonathan@cormier.co>
 */
 #ifndef BPFTRACE_BTF
 #include <linux/path.h>
