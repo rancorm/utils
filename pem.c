@@ -15,7 +15,7 @@
 
 void pem_usage(void) {
   printf("Certificate Output Tool\n");
-  printf("Usage: %s <path/to/cert/file.pem>\n", PROGNAME);
+  printf("Usage: %s <path/to/cert/file>\n", PROGNAME);
 }
 
 int main(int argc, char *argv[]) {
