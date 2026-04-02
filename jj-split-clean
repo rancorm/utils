@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# jj-split-clean [Jujutsu split that preserves change description]
+#
+JJ=$(command -v jj)
+
+JJ_EDITOR=true $JJ split "$@"
+$JJ describe -m ""
